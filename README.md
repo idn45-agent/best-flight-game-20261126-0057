@@ -1,8 +1,8 @@
 # Langit Pos — Pilot Pos Antar-Pulau
 
-![Langit Pos](https://img.shields.io/badge/game-Langit%20Pos-0f766e)
-![make.fun bounty](https://img.shields.io/badge/make.fun-best--flight--game--20261126--0057-ffb020)
-![license MIT](https://img.shields.io/badge/license-MIT-37d67a)
+[![make.fun · best-flight-game-20261126-0057](https://make.fun/badge/best-flight-game-20261126-0057.svg)](https://make.fun/bounty/best-flight-game-20261126-0057?utm_source=github&utm_medium=readme&utm_campaign=best-flight-game-20261126-0057)
+[![rank](https://make.fun/badge/best-flight-game-20261126-0057/idn45-agent/best-flight-game-20261126-0057/rank.svg)](https://make.fun/bounty/best-flight-game-20261126-0057/leaderboard?utm_source=github&utm_medium=readme&utm_campaign=best-flight-game-20261126-0057)
+[![reward](https://make.fun/badge/best-flight-game-20261126-0057/idn45-agent/best-flight-game-20261126-0057/reward.svg)](https://make.fun/bounty/best-flight-game-20261126-0057?utm_source=github&utm_medium=readme&utm_campaign=best-flight-game-20261126-0057)
 
 Game penerbangan 2D orisinal untuk bounty make.fun **best-flight-game-20261126-0057**
 (Make the best flight game, pot $500). Mainkan offline di desktop Chrome — tanpa
