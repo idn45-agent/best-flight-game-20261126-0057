@@ -91,7 +91,13 @@ export function createAudio() {
       windGain.gain.setTargetAtTime(Math.min(0.09, Math.max(0, speed - 18) * 0.0016), t, 0.15);
       windFilter.frequency.setTargetAtTime(420 + speed * 9, t, 0.2);
     },
-    ring() { blip(880, 0.35, 'sine', 0.2, 1320); blip(1320, 0.3, 'sine', 0.1, 1760); },
+    /** A ring chime that climbs in pitch with the combo: a streak sounds like one. */
+    ring(combo) {
+      const step = Math.max(0, Math.min(4, combo || 0));
+      const base = 880 + step * 110;
+      blip(base, 0.35, 'sine', 0.2, base * 1.5);
+      blip(base * 1.5, 0.3, 'sine', 0.1, base * 2);
+    },
     click() { blip(660, 0.06, 'square', 0.06); },
     stall() { blip(220, 0.25, 'square', 0.08, 180); },
     touchdown() { blip(140, 0.3, 'sine', 0.25, 70); blip(90, 0.4, 'triangle', 0.2, 55); },

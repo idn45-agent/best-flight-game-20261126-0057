@@ -1,11 +1,14 @@
-// Langit Pos: the game loop, screens, scoring and the wiring between the flight
-// model, the world, the renderer and the sound. One job: run the game.
+// Langit Pos v2: the game loop, screens, scoring and the wiring between the
+// flight model, the world, the renderer and the sound. One job: run the game.
+// v2 adds the combo multiplier, the speed bonus, missed-ring combo breaks and
+// a landing grade on the debrief, plus a fourth mission (night storm).
 import { VIEW, STEP, PLANE, SCORE } from './config.js';
 import { MISSIONS, windAt } from './missions.js';
 import { makeTerrain } from './terrain.js';
 import { createPlane, stepPlane, stepRollout } from './plane.js';
 import { createAudio } from './audio.js';
 import { createInput } from './input.js';
+import { createFeedback, ringScored, ringMissed, landingGrade } from './feedback.js';
 import {
   drawTitle, drawGame, drawBriefing, drawPause, drawEnd,
   cockpitButtonRects, titleMissionRects,
@@ -34,8 +37,11 @@ function createGame(missionIndex) {
     palette: PALETTES[mission.palette],
     missions: MISSIONS,
     ringsDone: mission.rings.map(() => false),
+    ringsMissed: mission.rings.map(() => false),
     nextRing: 0,
     score: 0,
+    feedback: createFeedback(),
+    grade: '',
     elapsed: 0,
     time: 0,
     camX: plane.x,
@@ -76,20 +82,34 @@ function ringCheck(g) {
   const p = g.plane;
   const ring = g.mission.rings[g.nextRing];
   if (!ring) return;
+  // Flew past the ring without flying through it: the combo breaks.
+  if (p.x > ring.x + 14 && !g.ringsDone[g.nextRing] && !g.ringsMissed[g.nextRing]) {
+    g.ringsMissed[g.nextRing] = true;
+    if (g.feedback.combo > 0) {
+      ringMissed(g.feedback);
+      toast(g, `Cincin ${g.nextRing + 1} terlewat — kombo putus`);
+    }
+    g.nextRing += 1;
+    return;
+  }
   if (Math.abs(p.x - ring.x) < 14 && Math.abs(p.alt - ring.alt) < ring.r) {
     g.ringsDone[g.nextRing] = true;
     const centred = Math.abs(p.alt - ring.alt) < ring.r * 0.4;
-    const gained = SCORE.ring + (centred ? SCORE.ringCentre : 0);
-    g.score += gained;
-    audio.ring();
-    toast(g, centred ? `Cincin ${g.nextRing + 1} tepat di tengah! +${gained}` : `Cincin ${g.nextRing + 1} dilewati! +${gained}`);
+    const result = ringScored(g.feedback, centred, p.speed);
+    g.score += result.points;
+    audio.ring(g.feedback.combo);
+    const parts = [`Cincin ${g.nextRing + 1} dilewati! +${result.points}`];
+    if (result.label) parts.push(`(${result.label})`);
+    toast(g, parts.join(' '));
     g.nextRing += 1;
   }
 }
 
 function finishFlight(g, win, reason, landingBonus) {
   g.screen = 'end';
-  g.end = { win, reason, landingBonus: landingBonus || 0 };
+  const soft = win && Math.abs(g.plane.verticalSpeed) < 2;
+  g.grade = win ? landingGrade(g.score, soft, g.plane.fuel / g.mission.fuel) : '';
+  g.end = { win, reason, landingBonus: landingBonus || 0, soft };
   if (win) {
     g.score += landingBonus;
     audio.fanfare();
@@ -173,7 +193,7 @@ function updatePlay(g, dt) {
     return;
   }
   if (g.mission.timeLimit > 0 && g.elapsed > g.mission.timeLimit && !g.rollingOut) {
-    finishFlight(g, false, 'Waktu habis — pasien menunggu terlalu lama', 0);
+    finishFlight(g, false, 'Waktu habis — kiriman tidak sampai', 0);
     return;
   }
   ringCheck(g);
@@ -221,6 +241,7 @@ function updateTitle(g) {
   if (input.wasPressed('1')) { game = createGame(0); }
   if (input.wasPressed('2')) { game = createGame(1); }
   if (input.wasPressed('3')) { game = createGame(2); }
+  if (input.wasPressed('4')) { game = createGame(3); }
   if (input.wasPressed('m') || input.wasPressed('M')) audio.setMuted(!audio.isMuted());
   g.camX += 12 * STEP;
   if (g.camX > 1400) g.camX = g.plane.x;

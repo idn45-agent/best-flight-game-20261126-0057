@@ -1,12 +1,14 @@
-// Screenshot scenes for Langit Pos: each one plays the real rules forward from
-// a fresh world for a fixed number of steps, steered by a simple autopilot, so
-// the frame is what a short game really looks like and the same seed always
-// gives the same frame.
+// Screenshot scenes for Langit Pos v2: each one plays the real rules forward
+// from a fresh world for a fixed number of steps, steered by a simple
+// autopilot, so the frame is what a short game really looks like and the same
+// seed always gives the same frame. v2 scores rings through the same combo
+// feedback the live game uses, so the end screen shows a real grade.
 import { STEP } from './config.js';
 import { makeTerrain } from './terrain.js';
 import { createPlane, stepPlane, stepRollout } from './plane.js';
 import { windAt } from './missions.js';
 import { PALETTES } from './config.js';
+import { ringScored, ringMissed, landingGrade } from './feedback.js';
 
 const SAMPLE = STEP;
 
@@ -82,29 +84,41 @@ export function runAutopilot(g, maxSeconds, stopAt) {
     } else {
       event = stepPlane(p, SAMPLE, autopilot(g), g.windNow, g.terrain, g.mission);
     }
-    // Rings.
+    // Rings, scored exactly like the live game: combo, centre, speed.
     const ring = g.mission.rings[g.nextRing];
-    if (ring && Math.abs(p.x - ring.x) < 14 && Math.abs(p.alt - ring.alt) < ring.r) {
-      g.ringsDone[g.nextRing] = true;
-      g.score += 100;
-      g.nextRing += 1;
+    if (ring && !g.ringsDone[g.nextRing]) {
+      if (p.x > ring.x + 14) {
+        g.ringsMissed[g.nextRing] = true;
+        ringMissed(g.feedback);
+        g.nextRing += 1;
+      } else if (Math.abs(p.x - ring.x) < 14 && Math.abs(p.alt - ring.alt) < ring.r) {
+        g.ringsDone[g.nextRing] = true;
+        const centred = Math.abs(p.alt - ring.alt) < ring.r * 0.4;
+        g.score += ringScored(g.feedback, centred, p.speed).points;
+        g.nextRing += 1;
+      }
     }
     if (event === 'landed') {
       const dest = g.mission.runways[g.mission.runways.length - 1];
       if (p.x >= dest.x0 - 20) {
         g.rollingOut = true;
       } else {
-        g.end = { win: false, reason: 'Mendarat kembali di landasan awal', landingBonus: 0 };
+        g.end = { win: false, reason: 'Mendarat kembali di landasan awal', landingBonus: 0, soft: false };
+        g.grade = '';
         g.screen = 'end';
         return g;
       }
     } else if (event === 'stopped') {
-      g.end = { win: true, reason: 'Pendaratan lembut di landasan tujuan', landingBonus: 150 + Math.round(p.fuel) * 2 };
-      g.score += g.end.landingBonus;
+      const soft = Math.abs(p.verticalSpeed) < 2;
+      const bonus = 150 + Math.round(p.fuel) * 2;
+      g.score += bonus;
+      g.grade = landingGrade(g.score, soft, p.fuel / g.mission.fuel);
+      g.end = { win: true, reason: 'Pendaratan lembut di landasan tujuan', landingBonus: bonus, soft };
       g.screen = 'end';
       return g;
     } else if (event === 'crashed' || event === 'ditched' || event === 'outoffuel') {
-      g.end = { win: false, reason: event === 'ditched' ? 'Jatuh ke laut' : event === 'outoffuel' ? 'Kehabisan bahan bakar' : 'Menabrak daratan', landingBonus: 0 };
+      g.end = { win: false, reason: event === 'ditched' ? 'Jatuh ke laut' : event === 'outoffuel' ? 'Kehabisan bahan bakar' : 'Menabrak daratan', landingBonus: 0, soft: false };
+      g.grade = '';
       g.screen = 'end';
       return g;
     }
@@ -117,19 +131,20 @@ export function runAutopilot(g, maxSeconds, stopAt) {
 
 /**
  * Stage the named scene on a fresh game and return it ready to draw.
- * cover: mission 1, ring 1 just ahead. mission: mission 2 at dusk, mid-course.
- * land: mission 1 on final approach, gear down, strip ahead. end: mission 1
- * landed, the debrief panel up.
+ * cover: mission 1, ring 1 close ahead and big. mission: the new night
+ * storm (mission 4), mid-course in the rain. land: mission 1 on final
+ * approach, gear down, strip ahead. end: mission 1 landed, the debrief
+ * panel with its landing grade up.
  */
 export function stageShot(name, createGame, missions) {
-  const pick = name === 'mission' ? 1 : 0;
+  const pick = name === 'mission' ? 3 : 0;
   const g = createGame(pick);
   g.screen = 'play';
   g.plane.throttle = 0;
   if (name === 'cover') {
-    runAutopilot(g, 120, (state) => state.plane.x >= 2380);
+    runAutopilot(g, 120, (state) => state.plane.x >= 2250);
   } else if (name === 'mission') {
-    runAutopilot(g, 240, (state) => state.plane.x >= 6550);
+    runAutopilot(g, 300, (state) => state.plane.x >= 6000);
   } else if (name === 'land') {
     const dest = g.mission.runways[1];
     runAutopilot(g, 400, (state) => state.plane.x >= dest.x0 - 420 && state.plane.alt - state.terrain.heightAt(state.plane.x) < 70);
